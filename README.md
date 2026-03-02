@@ -10,7 +10,7 @@
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.54+-red?logo=streamlit&logoColor=white)
 ![License](https://img.shields.io/badge/License-Academic-green)
 
-[Live Demo](https://news-credibility-monitor.streamlit.app/) · [Project Video](https://youtu.be/YOUR_VIDEO_LINK) · [Report (PDF)](Report/report.pdf)
+[Live Demo](https://news-credibility-monitor.streamlit.app/) · [Project Video](https://drive.google.com/file/d/1Mc5u1Z2PGCyHJRsFSGEUhLI2yJfPChGk/view?usp=sharing) · [Report (PDF)](Report/report.pdf)
 
 </div>
 
