@@ -17,3 +17,5 @@ data/processed/
 
 # OS Specific
 .DS_Store
+
+test/

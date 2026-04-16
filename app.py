@@ -266,7 +266,7 @@ def predict_credibility(text: str):
 # ═══════════════════════════════════════════════════════════════════════════
 with st.sidebar:
     st.markdown("## 📰 News Credibility Monitor")
-    st.caption("GenAI Capstone · Milestone 1")
+    st.caption("GenAI Capstone · Milestone 2")
     st.markdown("---")
 
 
@@ -300,7 +300,7 @@ with st.sidebar:
 # ═══════════════════════════════════════════════════════════════════════════
 
 st.title("📰 News Credibility Monitor")
-st.caption("Intelligent Fake-News Detection powered by Classical NLP · Milestone 1")
+st.caption("Intelligent Credibility Analysis with Agentic AI (LangGraph + RAG + LLM reasoning) · Milestone 2")
 
 # ---------------------------------------------------------------------------
 # Section 1 — Model Performance (compact)
@@ -448,4 +448,4 @@ if st.button("⚡ Analyze Credibility", type="primary", use_container_width=True
 # Footer
 # ---------------------------------------------------------------------------
 st.markdown("---")
-st.caption("News Credibility Monitor · Milestone 1 · Built with Scikit-Learn & Streamlit")
+st.caption("News Credibility Monitor · Milestone 2 · Built with Scikit-Learn, LangGraph, RAG & LLM reasoning")
