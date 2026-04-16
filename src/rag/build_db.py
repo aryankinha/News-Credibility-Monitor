@@ -10,9 +10,26 @@ CHROMA_DB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__f
 COLLECTION_NAME = "isot_news"
 
 def build_database(batch_size=512):
-    if os.path.exists(CHROMA_DB_DIR) and os.path.exists(os.path.join(CHROMA_DB_DIR, "chroma.sqlite3")):
-        print(f"Database already exists at {CHROMA_DB_DIR}. Skipping rebuild.")
-        return
+    sqlite_path = os.path.join(CHROMA_DB_DIR, "chroma.sqlite3")
+    if os.path.exists(CHROMA_DB_DIR) and os.path.exists(sqlite_path):
+        try:
+            existing_client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+            existing_collection = existing_client.get_collection(name=COLLECTION_NAME)
+            existing_count = existing_collection.count()
+
+            if existing_count > 1000:
+                print(
+                    f"Database already exists at {CHROMA_DB_DIR} "
+                    f"with {existing_count} documents. Skipping rebuild."
+                )
+                return
+
+            print(
+                f"Existing database found but only {existing_count} documents "
+                "detected. Rebuilding..."
+            )
+        except Exception:
+            print("Existing database found but collection check failed. Rebuilding...")
 
     print("Loading datasets...")
     fake_path = os.path.join("data", "raw", "Fake.csv")
@@ -64,7 +81,7 @@ def build_database(batch_size=512):
         batch_ids = ids[i:i+batch_size]
         batch_metadatas = metadatas[i:i+batch_size]
         
-        batch_embeddings = model.encode(batch_texts, batch_size=batch_size, show_progress_bar=False)
+        batch_embeddings = model.encode(batch_texts, batch_size=32, show_progress_bar=True)
         
         collection.add(
             ids=batch_ids,
