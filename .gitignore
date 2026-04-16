@@ -1,5 +1,6 @@
 # Virtual Environment
 venv/
+.venv/
 env/
 .env
 
@@ -18,6 +19,8 @@ data/processed/
 # OS Specific
 .DS_Store
 
-test/models/best_model.pkl
+models/best_model.pkl
 models/tfidf_vectorizer.pkl
 chroma_db/
+
+test/
