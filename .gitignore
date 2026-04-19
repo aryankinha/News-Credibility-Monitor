@@ -9,8 +9,8 @@ __pycache__/
 *.py[cod]
 
 # Data and Models (Large Files)
-data/interim/
-data/processed/
+backend/data/interim/
+backend/data/processed/
 # data/raw/*.csv - Now tracked with Git LFS
 
 # Jupyter Notebook Checkpoints
