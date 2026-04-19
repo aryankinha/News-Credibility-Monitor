@@ -255,6 +255,7 @@ Without these files, training and embedding build scripts will fail.
 
 ## Deployment Notes
 
+- Hosted frontend: https://news-credibility-monitor.vercel.app/
 - Root `requirements_deploy.txt` provides a lightweight deployment dependency set.
 - Frontend is a standard Vite static build output.
 - Backend is a FastAPI service and can be containerized or deployed on any Python host.
