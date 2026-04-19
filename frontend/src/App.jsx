@@ -48,9 +48,7 @@ const MODE_CONFIG = {
       { label: 'Preparing article features', model: 'TF-IDF vectorizer', provider: 'scikit-learn' },
       { label: 'Running logistic model', model: 'Logistic Regression', provider: 'scikit-learn' },
       { label: 'Calibrating confidence', model: 'Probability calibration', provider: 'scikit-learn' },
-      { label: 'Retrieving relevant documents', model: 'ChromaDB semantic search', provider: 'Vector Store' },
-      { label: 'Cross-checking agent outputs', model: 'llama-3.3-70b-versatile', provider: 'Groq' },
-      { label: 'Preparing final verdict', model: 'meta/llama-3.3-70b-instruct', provider: 'NVIDIA' },
+      { label: 'Preparing final verdict', model: 'Classifier output', provider: 'scikit-learn' },
     ],
   },
 }
@@ -444,37 +442,41 @@ function App() {
                 New Analysis
               </button>
             </div>
-            <VerdictCard final={result.final} mode={mode} mlSignal={result.debug.mlSignal} />
+            <VerdictCard final={result.final} agreement={result.agreement} mode={mode} mlSignal={result.debug.mlSignal} />
 
-            <div
-              className={`transform transition-all duration-700 ease-out ${
-                sectionIsVisible('agreement')
-                  ? 'translate-y-0 opacity-100'
-                  : 'pointer-events-none translate-y-4 opacity-0'
-              }`}
-            >
-              <AgreementSection agreement={result.agreement} mode={mode} mlSignal={result.debug.mlSignal} />
-            </div>
+            {mode === 'agentic' ? (
+              <>
+                <div
+                  className={`transform transition-all duration-700 ease-out ${
+                    sectionIsVisible('agreement')
+                      ? 'translate-y-0 opacity-100'
+                      : 'pointer-events-none translate-y-4 opacity-0'
+                  }`}
+                >
+                  <AgreementSection agreement={result.agreement} mode={mode} mlSignal={result.debug.mlSignal} />
+                </div>
 
-            <div
-              className={`transform transition-all duration-700 ease-out ${
-                sectionIsVisible('agents')
-                  ? 'translate-y-0 opacity-100'
-                  : 'pointer-events-none translate-y-4 opacity-0'
-              }`}
-            >
-              <AgentSection agents={result.agents} mode={mode} />
-            </div>
+                <div
+                  className={`transform transition-all duration-700 ease-out ${
+                    sectionIsVisible('agents')
+                      ? 'translate-y-0 opacity-100'
+                      : 'pointer-events-none translate-y-4 opacity-0'
+                  }`}
+                >
+                  <AgentSection agents={result.agents} mode={mode} />
+                </div>
 
-            <div
-              className={`transform transition-all duration-700 ease-out ${
-                sectionIsVisible('evidence')
-                  ? 'translate-y-0 opacity-100'
-                  : 'pointer-events-none translate-y-4 opacity-0'
-              }`}
-            >
-              <EvidenceSection evidence={result.evidence} mode={mode} />
-            </div>
+                <div
+                  className={`transform transition-all duration-700 ease-out ${
+                    sectionIsVisible('evidence')
+                      ? 'translate-y-0 opacity-100'
+                      : 'pointer-events-none translate-y-4 opacity-0'
+                  }`}
+                >
+                  <EvidenceSection evidence={result.evidence} mode={mode} />
+                </div>
+              </>
+            ) : null}
 
             <div
               className={`transform transition-all duration-700 ease-out ${
@@ -486,47 +488,49 @@ function App() {
               <RiskSection riskFactors={result.riskFactors} />
             </div>
 
-            <details
-              className={`group rounded-[28px] border border-[#3a3a42] bg-gradient-to-b from-[#2a2a30]/95 to-[#1f1f23]/95 p-5 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-all duration-700 ease-out ${
-                sectionIsVisible('debug')
-                  ? 'translate-y-0 opacity-100'
-                  : 'pointer-events-none translate-y-4 opacity-0'
-              }`}
-            >
-              <summary className="flex cursor-pointer list-none items-center gap-2 text-[13px] font-semibold text-[#a1a1aa] transition group-open:text-[#ececf1]">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-3.5 w-3.5 transition-transform duration-200 group-open:rotate-90"
-                  aria-hidden="true"
-                >
-                  <path d="m9 18 6-6-6-6" />
-                </svg>
-                <span>Peek under the hood</span>
-              </summary>
-              <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <div className="rounded-2xl border border-[#262629] bg-[#1c1c1f] p-4">
-                  <p className="text-[11px] font-semibold tracking-[0.24em] text-[#9FD8C9] uppercase">
-                    Dominant Agent
-                  </p>
-                  <p className="mt-2 text-base font-semibold text-[#ececf1]">
-                    {result.final.dominantAgent}
-                  </p>
+            {mode === 'agentic' ? (
+              <details
+                className={`group rounded-[28px] border border-[#3a3a42] bg-gradient-to-b from-[#2a2a30]/95 to-[#1f1f23]/95 p-5 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-all duration-700 ease-out ${
+                  sectionIsVisible('debug')
+                    ? 'translate-y-0 opacity-100'
+                    : 'pointer-events-none translate-y-4 opacity-0'
+                }`}
+              >
+                <summary className="flex cursor-pointer list-none items-center gap-2 text-[13px] font-semibold text-[#a1a1aa] transition group-open:text-[#ececf1]">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-3.5 w-3.5 transition-transform duration-200 group-open:rotate-90"
+                    aria-hidden="true"
+                  >
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                  <span>Peek under the hood</span>
+                </summary>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-[#262629] bg-[#1c1c1f] p-4">
+                    <p className="text-[11px] font-semibold tracking-[0.24em] text-[#9FD8C9] uppercase">
+                      Dominant Agent
+                    </p>
+                    <p className="mt-2 text-base font-semibold text-[#ececf1]">
+                      {result.final.dominantAgent}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-[#262629] bg-[#1c1c1f] p-4">
+                    <p className="text-[11px] font-semibold tracking-[0.24em] text-[#a8b8e0] uppercase">
+                      Conflict Resolution
+                    </p>
+                    <p className="mt-2 text-[13px] leading-7 text-[#a1a1aa]">
+                      {result.final.conflict}
+                    </p>
+                  </div>
                 </div>
-                <div className="rounded-2xl border border-[#262629] bg-[#1c1c1f] p-4">
-                  <p className="text-[11px] font-semibold tracking-[0.24em] text-[#a8b8e0] uppercase">
-                    Conflict Resolution
-                  </p>
-                  <p className="mt-2 text-[13px] leading-7 text-[#a1a1aa]">
-                    {result.final.conflict}
-                  </p>
-                </div>
-              </div>
-            </details>
+              </details>
+            ) : null}
           </section>
         ) : null}
       </main>

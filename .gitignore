@@ -27,3 +27,11 @@ test/
 backend/.venv/
 backend/__pycache__/
 backend/.env
+backend/.env.local
+
+# Frontend env (kept inside frontend/, never committed)
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+
+.claude/

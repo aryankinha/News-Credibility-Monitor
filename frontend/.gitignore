@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Env files (Vercel reads vars from project settings, not committed files)
+.env
+.env.local
+.env.*.local
+.env.production
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
