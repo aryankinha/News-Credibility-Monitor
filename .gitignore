@@ -9,8 +9,8 @@ __pycache__/
 *.py[cod]
 
 # Data and Models (Large Files)
-data/interim/
-data/processed/
+backend/data/interim/
+backend/data/processed/
 # data/raw/*.csv - Now tracked with Git LFS
 
 # Jupyter Notebook Checkpoints
@@ -27,3 +27,10 @@ test/
 backend/.venv/
 backend/__pycache__/
 backend/.env
+backend/.env.local
+
+# Frontend env (kept inside frontend/, never committed)
+frontend/.env
+frontend/.env.local
+
+.claude/

@@ -1,10 +1,12 @@
-# Backend specific ignore patterns
-backend/.venv/
-backend/__pycache__/
-backend/.env
-backend/.DS_Store
+# Paths are relative to this folder (backend/).
+.venv/
+__pycache__/
+.DS_Store
+
+# Secrets — keep .env.example, ignore real envs.
+.env
+.env.local
+.env.*.local
 
 data/interim/
 data/processed/
-
-test/

@@ -14,7 +14,7 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, ''
 const MIN_WORDS = 50
 const RESULT_REVEAL_ORDER = ['agreement', 'agents', 'evidence', 'risks', 'debug']
 const PIPELINE_INTERVAL_MS = 900
-const FINAL_REVEAL_DELAY_MS = 520
+const FINAL_REVEAL_DELAY_MS = 1400
 
 const MODE_CONFIG = {
   agentic: {
@@ -48,9 +48,7 @@ const MODE_CONFIG = {
       { label: 'Preparing article features', model: 'TF-IDF vectorizer', provider: 'scikit-learn' },
       { label: 'Running logistic model', model: 'Logistic Regression', provider: 'scikit-learn' },
       { label: 'Calibrating confidence', model: 'Probability calibration', provider: 'scikit-learn' },
-      { label: 'Retrieving relevant documents', model: 'ChromaDB semantic search', provider: 'Vector Store' },
-      { label: 'Cross-checking agent outputs', model: 'llama-3.3-70b-versatile', provider: 'Groq' },
-      { label: 'Preparing final verdict', model: 'meta/llama-3.3-70b-instruct', provider: 'NVIDIA' },
+      { label: 'Preparing final verdict', model: 'Classifier output', provider: 'scikit-learn' },
     ],
   },
 }
@@ -64,7 +62,6 @@ function App() {
   const [pipelineStepIndex, setPipelineStepIndex] = useState(0)
   const [revealedSections, setRevealedSections] = useState([])
   const [pendingResult, setPendingResult] = useState(null)
-  const [countdown, setCountdown] = useState(5)
 
   const resultsRef = useRef(null)
 
@@ -76,8 +73,9 @@ function App() {
   }, [input])
   const isInputTooShort = wordCount > 0 && wordCount < MIN_WORDS
   const isLoading = status === 'loading'
-  const isReportReady = status === 'ready' && result
   const isResultReady = status === 'result' && result
+  const isPipelineComplete = pipelineStepIndex >= pipelineSteps.length
+  const isPreparingReport = isLoading && isPipelineComplete
 
   useEffect(() => {
     if (!isLoading) {
@@ -115,33 +113,13 @@ function App() {
     const revealTimeout = window.setTimeout(() => {
       setResult(pendingResult)
       setPendingResult(null)
-      setStatus('ready')
-      setCountdown(5)
+      setStatus('result')
     }, FINAL_REVEAL_DELAY_MS)
 
     return () => {
       window.clearTimeout(revealTimeout)
     }
   }, [isLoading, pendingResult, pipelineStepIndex, pipelineSteps.length])
-
-  useEffect(() => {
-    if (!isReportReady) {
-      return
-    }
-
-    if (countdown <= 0) {
-      setStatus('result')
-      return
-    }
-
-    const timer = window.setTimeout(() => {
-      setCountdown((current) => current - 1)
-    }, 1000)
-
-    return () => {
-      window.clearTimeout(timer)
-    }
-  }, [isReportReady, countdown])
 
   useEffect(() => {
     if (!isResultReady) {
@@ -197,15 +175,9 @@ function App() {
     setRevealedSections([])
     setPipelineStepIndex(0)
     setInput('')
-    setCountdown(5)
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
-  }
-
-  function handleShowReport() {
-    setStatus('result')
-    setCountdown(0)
   }
 
   async function handleSubmit(event) {
@@ -227,7 +199,6 @@ function App() {
     setPendingResult(null)
     setRevealedSections([])
     setPipelineStepIndex(0)
-    setCountdown(5)
 
     try {
       const response = await fetch(`${API_BASE_URL}/analyze`, {
@@ -241,7 +212,7 @@ function App() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data?.error || 'The analysis request failed. Please try again.')
+        throw new Error(data?.detail || data?.error || 'The analysis request failed. Please try again.')
       }
 
       setPendingResult(normalizeAnalysisResult(data, mode))
@@ -262,7 +233,7 @@ function App() {
       />
 
       <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
-        {!isLoading && !isReportReady && !isResultReady ? (
+        {!isLoading && !isResultReady ? (
           <section
             className={`mx-auto flex w-full max-w-4xl flex-col items-center text-center ${
               status === 'idle' ? 'flex-1 justify-center pt-8 sm:pt-12' : 'pt-8 sm:pt-10'
@@ -305,85 +276,24 @@ function App() {
               steps={pipelineSteps}
               activeStepIndex={pipelineStepIndex}
             />
-          </section>
-        ) : null}
 
-        {isReportReady ? (
-          <section className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-2xl flex-col items-center justify-center text-center">
-            <div className="relative w-full">
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute -inset-2 rounded-[32px] bg-gradient-to-r from-[#7FB3D5]/25 via-[#9FD8C9]/30 to-[#E0A8C8]/25 opacity-70 blur-2xl"
-              />
-              <div className="relative overflow-hidden rounded-[28px] border border-[#3a3a42] bg-gradient-to-b from-[#2a2a30]/95 to-[#1f1f23]/95 p-8 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.6)] backdrop-blur-2xl sm:p-10">
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#9FD8C9]/60 to-transparent"
-                />
-
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-[#6BAAA5]/50 bg-[#1a2a2f]">
-                  <span className="absolute flex h-16 w-16 animate-ping rounded-2xl bg-[#9FD8C9]/10" />
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="relative h-7 w-7 text-[#9FD8C9]"
-                    aria-hidden="true"
-                  >
-                    <path d="m5 12 5 5L20 7" />
-                  </svg>
-                </div>
-
-                <p className="mt-5 text-[11px] font-semibold tracking-[0.24em] text-[#9FD8C9] uppercase">
-                  Analysis complete
-                </p>
-                <h2 className="mt-2 text-2xl font-bold text-[#ececf1] sm:text-3xl">
-                  Your credibility report is ready
-                </h2>
-                <p className="mx-auto mt-3 max-w-md text-[14px] leading-6 text-[#a1a1aa]">
-                  All agents have delivered their verdicts. Opening your full report in{' '}
-                  <span className="font-semibold text-[#ececf1] tabular-nums">{countdown}s</span>…
-                </p>
-
-                <div className="mx-auto mt-5 h-1 w-full max-w-xs overflow-hidden rounded-full bg-[#1d1d21]">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-[#7FB3D5] via-[#9FD8C9] to-[#E0A8C8] transition-all duration-1000 ease-linear"
-                    style={{ width: `${((5 - countdown) / 5) * 100}%` }}
-                  />
-                </div>
-
-                <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={handleShowReport}
-                    className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-b from-[#ffffff] to-[#d4d4d8] px-5 py-2 text-[14px] font-semibold text-[#0d0d0f] shadow-[0_4px_14px_-2px_rgba(255,255,255,0.25)] transition-all duration-200 hover:shadow-[0_6px_18px_-2px_rgba(255,255,255,0.35)] hover:brightness-105 active:brightness-95"
-                  >
-                    <span>View Report</span>
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="h-3.5 w-3.5"
-                      aria-hidden="true"
-                    >
-                      <path d="M5 12h14" />
-                      <path d="m12 5 7 7-7 7" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleReset}
-                    className="inline-flex items-center gap-2 rounded-lg border border-[#3a3a42] bg-[#2a2a30]/80 px-5 py-2 text-[14px] font-semibold text-[#ececf1] backdrop-blur-xl transition-all duration-200 hover:border-[#5a7a95] hover:bg-[#33333a]/80"
-                  >
-                    Start over
-                  </button>
-                </div>
+            <div
+              className={`mt-8 flex items-center justify-center gap-3 transition-all duration-500 ${
+                isPreparingReport ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
+              }`}
+              aria-live="polite"
+            >
+              <div className="inline-flex items-center gap-3 rounded-full border border-[#3a3a42] bg-[#151517]/80 py-2 pl-2 pr-5 text-[13px] text-[#a1a1aa] backdrop-blur-xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.55)]">
+                <span className="relative flex h-6 w-6 items-center justify-center">
+                  <span className="absolute h-6 w-6 animate-ping rounded-full bg-[#9FD8C9]/20" />
+                  <span className="relative h-2.5 w-2.5 rounded-full bg-gradient-to-br from-[#7FB3D5] via-[#9FD8C9] to-[#E0A8C8]" />
+                </span>
+                <span className="font-medium text-[#ececf1]">Preparing your report</span>
+                <span className="flex items-end gap-0.5" aria-hidden="true">
+                  <span className="h-1 w-1 animate-bounce rounded-full bg-[#9FD8C9] [animation-delay:-0.3s]" />
+                  <span className="h-1 w-1 animate-bounce rounded-full bg-[#9FD8C9] [animation-delay:-0.15s]" />
+                  <span className="h-1 w-1 animate-bounce rounded-full bg-[#9FD8C9]" />
+                </span>
               </div>
             </div>
           </section>
@@ -444,37 +354,41 @@ function App() {
                 New Analysis
               </button>
             </div>
-            <VerdictCard final={result.final} mode={mode} mlSignal={result.debug.mlSignal} />
+            <VerdictCard final={result.final} agreement={result.agreement} mode={mode} mlSignal={result.debug.mlSignal} />
 
-            <div
-              className={`transform transition-all duration-700 ease-out ${
-                sectionIsVisible('agreement')
-                  ? 'translate-y-0 opacity-100'
-                  : 'pointer-events-none translate-y-4 opacity-0'
-              }`}
-            >
-              <AgreementSection agreement={result.agreement} mode={mode} mlSignal={result.debug.mlSignal} />
-            </div>
+            {mode === 'agentic' ? (
+              <>
+                <div
+                  className={`transform transition-all duration-700 ease-out ${
+                    sectionIsVisible('agreement')
+                      ? 'translate-y-0 opacity-100'
+                      : 'pointer-events-none translate-y-4 opacity-0'
+                  }`}
+                >
+                  <AgreementSection agreement={result.agreement} mode={mode} mlSignal={result.debug.mlSignal} />
+                </div>
 
-            <div
-              className={`transform transition-all duration-700 ease-out ${
-                sectionIsVisible('agents')
-                  ? 'translate-y-0 opacity-100'
-                  : 'pointer-events-none translate-y-4 opacity-0'
-              }`}
-            >
-              <AgentSection agents={result.agents} mode={mode} />
-            </div>
+                <div
+                  className={`transform transition-all duration-700 ease-out ${
+                    sectionIsVisible('agents')
+                      ? 'translate-y-0 opacity-100'
+                      : 'pointer-events-none translate-y-4 opacity-0'
+                  }`}
+                >
+                  <AgentSection agents={result.agents} mode={mode} />
+                </div>
 
-            <div
-              className={`transform transition-all duration-700 ease-out ${
-                sectionIsVisible('evidence')
-                  ? 'translate-y-0 opacity-100'
-                  : 'pointer-events-none translate-y-4 opacity-0'
-              }`}
-            >
-              <EvidenceSection evidence={result.evidence} mode={mode} />
-            </div>
+                <div
+                  className={`transform transition-all duration-700 ease-out ${
+                    sectionIsVisible('evidence')
+                      ? 'translate-y-0 opacity-100'
+                      : 'pointer-events-none translate-y-4 opacity-0'
+                  }`}
+                >
+                  <EvidenceSection evidence={result.evidence} mode={mode} />
+                </div>
+              </>
+            ) : null}
 
             <div
               className={`transform transition-all duration-700 ease-out ${
@@ -486,47 +400,49 @@ function App() {
               <RiskSection riskFactors={result.riskFactors} />
             </div>
 
-            <details
-              className={`group rounded-[28px] border border-[#3a3a42] bg-gradient-to-b from-[#2a2a30]/95 to-[#1f1f23]/95 p-5 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-all duration-700 ease-out ${
-                sectionIsVisible('debug')
-                  ? 'translate-y-0 opacity-100'
-                  : 'pointer-events-none translate-y-4 opacity-0'
-              }`}
-            >
-              <summary className="flex cursor-pointer list-none items-center gap-2 text-[13px] font-semibold text-[#a1a1aa] transition group-open:text-[#ececf1]">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-3.5 w-3.5 transition-transform duration-200 group-open:rotate-90"
-                  aria-hidden="true"
-                >
-                  <path d="m9 18 6-6-6-6" />
-                </svg>
-                <span>Peek under the hood</span>
-              </summary>
-              <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <div className="rounded-2xl border border-[#262629] bg-[#1c1c1f] p-4">
-                  <p className="text-[11px] font-semibold tracking-[0.24em] text-[#9FD8C9] uppercase">
-                    Dominant Agent
-                  </p>
-                  <p className="mt-2 text-base font-semibold text-[#ececf1]">
-                    {result.final.dominantAgent}
-                  </p>
+            {mode === 'agentic' ? (
+              <details
+                className={`group rounded-[28px] border border-[#3a3a42] bg-gradient-to-b from-[#2a2a30]/95 to-[#1f1f23]/95 p-5 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-all duration-700 ease-out ${
+                  sectionIsVisible('debug')
+                    ? 'translate-y-0 opacity-100'
+                    : 'pointer-events-none translate-y-4 opacity-0'
+                }`}
+              >
+                <summary className="flex cursor-pointer list-none items-center gap-2 text-[13px] font-semibold text-[#a1a1aa] transition group-open:text-[#ececf1]">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-3.5 w-3.5 transition-transform duration-200 group-open:rotate-90"
+                    aria-hidden="true"
+                  >
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                  <span>Peek under the hood</span>
+                </summary>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-[#262629] bg-[#1c1c1f] p-4">
+                    <p className="text-[11px] font-semibold tracking-[0.24em] text-[#9FD8C9] uppercase">
+                      Dominant Agent
+                    </p>
+                    <p className="mt-2 text-base font-semibold text-[#ececf1]">
+                      {result.final.dominantAgent}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-[#262629] bg-[#1c1c1f] p-4">
+                    <p className="text-[11px] font-semibold tracking-[0.24em] text-[#a8b8e0] uppercase">
+                      Conflict Resolution
+                    </p>
+                    <p className="mt-2 text-[13px] leading-7 text-[#a1a1aa]">
+                      {result.final.conflict}
+                    </p>
+                  </div>
                 </div>
-                <div className="rounded-2xl border border-[#262629] bg-[#1c1c1f] p-4">
-                  <p className="text-[11px] font-semibold tracking-[0.24em] text-[#a8b8e0] uppercase">
-                    Conflict Resolution
-                  </p>
-                  <p className="mt-2 text-[13px] leading-7 text-[#a1a1aa]">
-                    {result.final.conflict}
-                  </p>
-                </div>
-              </div>
-            </details>
+              </details>
+            ) : null}
           </section>
         ) : null}
       </main>
