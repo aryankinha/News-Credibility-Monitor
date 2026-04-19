@@ -1,0 +1,806 @@
+% ============================================================
+%  News Credibility Monitor — End-Semester Report
+%  Overleaf-ready  •  pdfLaTeX / XeLaTeX / LuaLaTeX
+% ============================================================
+\documentclass[12pt, a4paper]{article}
+
+% ── Packages ──────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+
+% ── Colours & Links ───────────────────────────────────────
+\definecolor{linkblue}{HTML}{2563EB}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=linkblue,
+    citecolor=linkblue,
+    urlcolor=linkblue,
+}
+
+% ── Code listing style ────────────────────────────────────
+\definecolor{codebg}{HTML}{F5F5F5}
+\definecolor{codeframe}{HTML}{D4D4D4}
+\lstset{
+    backgroundcolor=\color{codebg},
+    frame=single,
+    rulecolor=\color{codeframe},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    captionpos=b,
+}
+
+% ── Header / Footer ──────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small News Credibility Monitor}
+\fancyhead[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ── Section formatting ───────────────────────────────────
+\titleformat{\section}{\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{1em}{}
+
+% ── Spacing ──────────────────────────────────────────────
+\onehalfspacing
+
+% ════════════════════════════════════════════════════════════
+\begin{document}
+
+% ── Title Page ───────────────────────────────────────────
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+
+    {\Huge\bfseries News Credibility Monitor\\[0.3cm]}
+    {\Large An AI-Powered Multi-Agent System for\\Automated News Verification}
+
+    \vspace{1.5cm}
+
+    {\large
+    % ── Replace with your details ──
+    \textbf{Course:} Generative AI Capstone Project\\[0.3cm]
+    \textbf{Institution:} Newton School of Technology\\[0.3cm]
+    \textbf{Date:} April 2026
+    }
+
+    \vspace{2cm}
+
+    \begin{abstract}
+    \noindent
+    This report presents the design, implementation, and deployment of the
+    \textbf{News Credibility Monitor}---an AI-powered system that assesses the
+    credibility of news articles through a multi-layered pipeline combining
+    classical machine learning, Retrieval-Augmented Generation (RAG), and
+    multi-agent reasoning. The system employs a TF-IDF vectorizer paired with
+    Logistic Regression for an initial classification signal, an in-memory
+    vector store loaded from precomputed embeddings for evidence retrieval,
+    and three specialised LLM-based reasoning agents whose outputs are
+    synthesised by a final judge agent. The complete pipeline is orchestrated
+    as a LangGraph StateGraph with conditional branching based on ML
+    confidence. The frontend is a React application deployed on Vercel, and
+    the backend is a FastAPI service deployed on Render. Evaluation on the
+    ISOT Fake News Dataset yields 98.88\% classification accuracy on the ML
+    layer, while the agentic pipeline provides interpretable, multi-perspective
+    reasoning for each verdict.
+    \end{abstract}
+
+    \vfill
+\end{titlepage}
+
+% ── Table of Contents ────────────────────────────────────
+\newpage
+\tableofcontents
+\newpage
+
+% ════════════════════════════════════════════════════════════
+\section{Introduction}
+% ════════════════════════════════════════════════════════════
+
+The proliferation of misinformation in digital media has created an urgent
+need for automated tools that can assess the credibility of news content at
+scale. Traditional approaches---either purely statistical classifiers or
+human fact-checking---each have significant limitations: classifiers produce
+opaque binary labels with no reasoning, while human review cannot keep pace
+with the volume of online content.
+
+This project addresses both shortcomings by designing a \textbf{hybrid
+intelligence pipeline} that combines three complementary techniques:
+
+\begin{enumerate}[leftmargin=2em]
+    \item \textbf{Classical Machine Learning} --- A TF-IDF + Logistic
+          Regression classifier provides a fast, high-accuracy initial
+          signal (prediction and confidence score).
+    \item \textbf{Retrieval-Augmented Generation (RAG)} --- Semantically
+          similar articles from a verified dataset are retrieved to ground
+          the analysis in evidence, reducing hallucination risk.
+    \item \textbf{Multi-Agent Reasoning} --- Three LLM-based agents with
+          distinct analytical perspectives (conservative, sceptical, neutral)
+          independently analyse the article, and a final judge agent
+          synthesises their outputs into a transparent, explainable verdict.
+\end{enumerate}
+
+The pipeline is orchestrated using \textbf{LangGraph}, a state-machine
+framework for composable AI workflows, with a conditional branch that
+bypasses the RAG retrieval step when the ML model's confidence exceeds a
+configurable threshold (85\%). This design balances latency and
+thoroughness: high-confidence predictions are fast-tracked, while
+ambiguous cases receive additional evidence before reasoning begins.
+
+The system is fully deployed with a React frontend on Vercel and a FastAPI
+backend on Render, making it accessible as a web application for
+demonstration and evaluation.
+
+
+% ════════════════════════════════════════════════════════════
+\section{System Overview}
+% ════════════════════════════════════════════════════════════
+
+The News Credibility Monitor is structured as a two-tier web application
+with a clear separation between the presentation layer and the analysis
+engine.
+
+\subsection{High-Level Architecture}
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Frontend} --- A single-page React application (Vite,
+          Tailwind CSS~4, React~19) deployed on Vercel. It collects the
+          user's article text, displays an animated processing pipeline
+          during analysis, and renders the structured verdict with agent
+          reasoning, evidence summaries, and risk indicators.
+    \item \textbf{Backend} --- A FastAPI service deployed on Render's free
+          tier. It exposes two endpoints: a health-check (\texttt{GET /})
+          and the analysis endpoint (\texttt{POST /analyze}). All ML
+          inference, RAG retrieval, and LLM orchestration occur server-side.
+    \item \textbf{Keep-Alive} --- A GitHub Actions cron job pings the
+          Render service every 14~minutes to prevent the free-tier instance
+          from entering a sleep state.
+\end{itemize}
+
+\subsection{Data Flow Summary}
+
+The end-to-end data flow for a single analysis request proceeds as follows:
+
+\begin{enumerate}[leftmargin=2em]
+    \item User pastes an article (\(\geq\)50 words) into the web interface.
+    \item The frontend sends a \texttt{POST /analyze} request to the backend.
+    \item The backend preprocesses the text and runs the LangGraph pipeline.
+    \item The structured result (verdict, confidence, agent reasoning,
+          evidence, risk factors) is returned as JSON.
+    \item The frontend normalises the response and renders results with
+          staggered reveal animations.
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{system_design.png}
+    \caption{High-level system architecture showing the data flow from user
+             input through the ML, RAG, and multi-agent layers to the final
+             verdict.}
+    \label{fig:architecture}
+\end{figure}
+
+
+% ════════════════════════════════════════════════════════════
+\section{Methodology}
+% ════════════════════════════════════════════════════════════
+
+\subsection{Text Preprocessing}
+
+All article text passes through a shared cleaning pipeline before entering
+either the ML or RAG pathways:
+
+\begin{enumerate}[leftmargin=2em]
+    \item \textbf{Dateline stripping} --- Publisher attribution patterns
+          (e.g., \texttt{WASHINGTON (Reuters) ---}) are removed from the
+          first 50~characters only, preventing accidental content loss on
+          user-supplied text.
+    \item \textbf{Lowercasing} and removal of non-alphabetic characters.
+    \item \textbf{Stopword removal} using NLTK's English stopword list.
+\end{enumerate}
+
+This conservative cleaning strategy preserves the semantic content of
+user-provided articles while normalising the surface form for both the
+TF-IDF vectorizer and the RAG retrieval query.
+
+
+% ─── 3.2  ML Model ───────────────────────────────────────
+\subsection{Machine Learning Classification Layer}
+
+The ML layer provides the system's initial, low-latency credibility signal.
+
+\subsubsection{Feature Extraction}
+
+Articles are transformed into numerical feature vectors using a
+\textbf{TF-IDF (Term Frequency--Inverse Document Frequency)} vectorizer
+with the following configuration:
+
+\begin{itemize}[leftmargin=2em]
+    \item \texttt{max\_features = 10{,}000}
+    \item \texttt{ngram\_range = (1, 2)} --- captures both unigrams and
+          bigrams
+\end{itemize}
+
+Stopword removal is delegated to the upstream text cleaner to avoid
+double-filtering.
+
+\subsubsection{Classifier}
+
+The classifier is a \textbf{Logistic Regression} model with the following
+hyperparameters:
+
+\begin{itemize}[leftmargin=2em]
+    \item \texttt{max\_iter = 1000}
+    \item \texttt{solver = lbfgs}
+    \item \texttt{C = 1.0} (default regularisation)
+    \item \texttt{class\_weight = balanced} --- compensates for any
+          Real/Fake class imbalance in the training data
+\end{itemize}
+
+\subsubsection{Training Data}
+
+The model is trained on the \textbf{ISOT Fake News Dataset}, which
+comprises approximately 44,000 articles split between verified real news
+(sourced from Reuters) and fake news (sourced from unreliable websites
+flagged by Politifact). The dataset is split 80/20 for training and
+evaluation (\texttt{random\_state=42}).
+
+\subsubsection{Output}
+
+The ML node produces two values that propagate through the rest of the
+pipeline:
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Prediction}: \texttt{REAL} or \texttt{FAKE}
+    \item \textbf{Confidence}: The classifier's predicted probability
+          (0--100\%), used for conditional routing
+\end{itemize}
+
+
+% ─── 3.3  RAG System ─────────────────────────────────────
+\subsection{Retrieval-Augmented Generation (RAG) Layer}
+
+The RAG layer enriches the analysis with evidence from a verified reference
+corpus, reducing the LLM agents' tendency to hallucinate.
+
+\subsubsection{Embedding Strategy}
+
+Embeddings are \textbf{precomputed offline} using the
+\texttt{all-MiniLM-L6-v2} model from SentenceTransformers. A stratified
+sample of 5{,}000 articles from the ISOT dataset is embedded and serialised
+as a pickle file (\texttt{embeddings.pkl}). This design decision has two
+key advantages:
+
+\begin{enumerate}[leftmargin=2em]
+    \item \textbf{No PyTorch at runtime} --- The production server does not
+          need the 2\,GB+ PyTorch/SentenceTransformers stack, keeping memory
+          usage within Render's 512\,MiB free-tier limit.
+    \item \textbf{No persistent disk} --- Embeddings are loaded into an
+          \textbf{ephemeral ChromaDB client} (in-memory) at startup,
+          eliminating dependency on persistent storage.
+\end{enumerate}
+
+\subsubsection{Query-Time Retrieval}
+
+At query time, the article text is cleaned and passed to ChromaDB's
+built-in \textbf{DefaultEmbeddingFunction} (ONNX-based, lightweight), which
+generates the query embedding without loading PyTorch. The top-$k$
+($k{=}5$) most similar articles are retrieved along with their metadata
+(label, subject, source) and distance scores.
+
+\subsubsection{Conditional RAG}
+
+The RAG retrieval step is \textbf{conditionally executed} based on the ML
+model's confidence score:
+
+\[
+\text{next\_node} =
+\begin{cases}
+    \texttt{rag\_node}      & \text{if } \mathrm{confidence} < 85\% \\
+    \texttt{agent\_a\_node} & \text{if } \mathrm{confidence} \geq 85\%
+\end{cases}
+\]
+
+When the ML model is highly confident, the system bypasses RAG to reduce
+latency. When confidence is low, retrieved evidence provides critical
+context for the reasoning agents.
+
+
+% ─── 3.4  Multi-Agent System ─────────────────────────────
+\subsection{Multi-Agent Reasoning System}
+
+The multi-agent layer is the core differentiator of this system. Rather
+than relying on a single LLM call, three agents with distinct analytical
+personas independently evaluate the article, and a judge agent aggregates
+their outputs.
+
+\subsubsection{Agent Topology}
+
+The agents are orchestrated as a \textbf{LangGraph StateGraph} with the
+following topology:
+
+\begin{lstlisting}[caption={LangGraph pipeline topology},label={lst:topology}]
+preprocess_node -> ml_node -> [conditional]
+    |-- confidence >= 85% --> agent_a_node
+    |-- confidence <  85% --> rag_node --> agent_a_node
+                                              |
+                                         agent_b_node
+                                              |
+                                         agent_c_node
+                                              |
+                                          judge_node
+                                              |
+                                         output_node --> END
+\end{lstlisting}
+
+Agents execute \textbf{sequentially} (A~$\to$~B~$\to$~C), not in parallel.
+Each agent receives the full article text, the ML prediction with
+confidence, and any retrieved RAG evidence.
+
+\subsubsection{Agent Personas}
+
+Each agent is implemented as a structured LLM prompt with a distinct role
+description:
+
+\begin{table}[H]
+\centering
+\caption{Multi-agent persona configuration}
+\label{tab:agents}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Agent} & \textbf{Role} & \textbf{Persona} & \textbf{LLM Provider} \\
+\midrule
+Agent A & Conservative  & Trusts ML signal and evidence heavily
+        & Groq \\
+Agent B & Sceptical     & Challenges evidence quality, highlights uncertainty
+        & Groq \\
+Agent C & Neutral       & Balanced, objective reasoning
+        & Groq \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All three agents use \textbf{Llama~3.3-70B-Versatile} via the Groq API
+(temperature~$= 0.3$, max tokens~$= 1{,}500$). Each produces a structured
+output:
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Verdict}: \texttt{REAL} or \texttt{FAKE}
+    \item \textbf{Confidence}: 0--100
+    \item \textbf{Reasoning}: 3--5 sentence justification
+\end{itemize}
+
+
+% ─── 3.5  Final Judge ────────────────────────────────────
+\subsection{Final Judge Agent}
+
+The judge agent receives all three agent responses, the ML signal, and the
+agreement statistics (computed before the prompt is assembled). It uses a
+different LLM---\textbf{Llama~3.3-70B-Instruct} via the NVIDIA AI
+Endpoints API (temperature~$= 0.2$, top-$p = 0.7$, max tokens~$=
+1{,}024$)---to provide an independent synthesis.
+
+Using a separate LLM provider for the judge reduces the risk of systematic
+bias from a single model. If the NVIDIA endpoint fails, the system falls
+back to the Groq API.
+
+The judge produces:
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Final Verdict}: \texttt{REAL} or \texttt{FAKE}
+    \item \textbf{Final Confidence}: 0--100
+    \item \textbf{Consensus Summary}: Synthesis of multi-agent reasoning
+    \item \textbf{Dominant Agent}: Which agent was most influential
+    \item \textbf{Conflict Resolution}: How disagreements were handled
+\end{itemize}
+
+
+% ─── 3.6  Output & Risk ─────────────────────────────────
+\subsection{Output Assembly and Risk Detection}
+
+The final \texttt{output\_node} assembles the structured response and
+computes several \textbf{risk factors}:
+
+\begin{itemize}[leftmargin=2em]
+    \item ML confidence below 70\%
+    \item Mixed labels in retrieved RAG evidence
+    \item Weak agent consensus (Low agreement level)
+    \item Insufficient evidence (fewer than 2 retrieved documents)
+    \item Repetitive retrieved content (Jaccard similarity $> 0.4$ between
+          top-2 documents)
+\end{itemize}
+
+These risk indicators are surfaced in the frontend to help users calibrate
+their trust in the verdict.
+
+
+% ─── 3.7  Agent Workflow ─────────────────────────────────
+\subsection{Agent Workflow}
+
+The end-to-end agent workflow follows a structured, multi-stage pipeline
+orchestrated by LangGraph:
+
+\begin{enumerate}[leftmargin=2em]
+    \item \textbf{ML Classification} --- The cleaned article is vectorised
+          and classified by the Logistic Regression model, producing a
+          prediction (\texttt{REAL}/\texttt{FAKE}) and a confidence score.
+    \item \textbf{Conditional RAG} --- If ML confidence falls below the
+          85\% threshold, the system retrieves the top-5 semantically
+          similar articles from the in-memory ChromaDB store. If confidence
+          is high, this step is skipped to reduce latency.
+    \item \textbf{Multi-Agent Reasoning} --- Three agents execute
+          sequentially (A~$\to$~B~$\to$~C). Each agent receives the full
+          article text, the ML prediction with confidence, and any
+          retrieved evidence documents. Despite sequential execution, each
+          agent reasons independently---its prompt contains only the shared
+          evidence, not the outputs of preceding agents---ensuring that
+          each perspective is uncontaminated by the others.
+    \item \textbf{Judge Aggregation} --- The judge agent receives all
+          three agent responses together with the ML signal and
+          pre-computed agreement statistics, and synthesises a final
+          verdict.
+    \item \textbf{Output Assembly} --- The output node compiles the
+          structured response, computes risk factors, and returns the
+          result to the API caller.
+\end{enumerate}
+
+This staged design ensures that each component operates on well-defined
+inputs and that failures at any node are isolated and recoverable (every
+node returns fallback values on exception).
+
+
+% ─── 3.8  Prompting Strategy ─────────────────────────────
+\subsection{Prompting Strategy}
+
+Prompt engineering is central to the quality and consistency of agent
+outputs. The system uses a shared prompt template with role-specific
+preambles:
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Role injection} --- Each agent prompt begins with a
+          persona description that shapes reasoning style:
+          \begin{itemize}
+              \item Agent~A is instructed to trust the ML signal and
+                    retrieved evidence heavily.
+              \item Agent~B is instructed to challenge evidence quality and
+                    highlight uncertainty.
+              \item Agent~C is instructed to weigh all signals objectively
+                    without strong bias.
+          \end{itemize}
+    \item \textbf{Evidence grounding} --- The prompt includes the article
+          text (truncated to 1{,}500 characters), the ML prediction string,
+          and formatted RAG evidence (label, subject, source, and a
+          300-character snippet per document).
+    \item \textbf{Structured output enforcement} --- Agents are required to
+          respond in exactly three labelled fields:
+          \texttt{Verdict}, \texttt{Confidence}, and \texttt{Reasoning}.
+          This deterministic format enables reliable regex-based parsing in
+          the output node.
+    \item \textbf{Anti-hallucination directive} --- The system message
+          explicitly states: \textit{``Respond ONLY based on the evidence
+          provided. Never invent or hallucinate facts.''} This constraint
+          anchors reasoning to the supplied ML and RAG signals.
+\end{itemize}
+
+The judge prompt follows a similar structure but requests additional fields
+(\texttt{Consensus Summary}, \texttt{Dominant Agent},
+\texttt{Conflict Resolution}) and receives the pre-computed agreement
+level and verdict distribution to aid synthesis.
+
+
+% ─── 3.9  State Management ───────────────────────────────
+\subsection{State Management}
+
+Pipeline state is managed through a \textbf{LangGraph \texttt{AgentState}
+TypedDict} that is passed between all nodes. The state dictionary contains
+the following fields:
+
+\begin{table}[H]
+\centering
+\caption{AgentState fields and their lifecycle}
+\label{tab:state}
+\begin{tabular}{@{}llp{5.5cm}@{}}
+\toprule
+\textbf{Field} & \textbf{Type} & \textbf{Populated by} \\
+\midrule
+\texttt{article\_text}      & \texttt{str}           & Caller (initial input) \\
+\texttt{cleaned\_text}      & \texttt{str}           & \texttt{preprocess\_node} \\
+\texttt{ml\_prediction}     & \texttt{str}           & \texttt{ml\_node} \\
+\texttt{ml\_confidence}     & \texttt{float}         & \texttt{ml\_node} \\
+\texttt{retrieved\_docs}    & \texttt{List[dict]}    & \texttt{rag\_node} (conditional) \\
+\texttt{agent\_a\_response} & \texttt{str}           & \texttt{agent\_a\_node} \\
+\texttt{agent\_b\_response} & \texttt{str}           & \texttt{agent\_b\_node} \\
+\texttt{agent\_c\_response} & \texttt{str}           & \texttt{agent\_c\_node} \\
+\texttt{judge\_response}    & \texttt{str}           & \texttt{judge\_node} \\
+\texttt{final\_report}      & \texttt{dict}          & \texttt{output\_node} \\
+\texttt{error}              & \texttt{Optional[str]} & Any node (on failure) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Each node receives the full state dictionary and returns a \emph{partial}
+update containing only the fields it populates. LangGraph merges the
+returned partial into the running state automatically, ensuring that
+downstream nodes always see a consistent, progressively enriched view of
+the data. This merge-based design eliminates manual state-passing logic
+and guarantees that no node can accidentally overwrite fields it does not
+own.
+
+
+% ════════════════════════════════════════════════════════════
+\section{System Architecture}
+% ════════════════════════════════════════════════════════════
+
+\subsection{Technology Stack}
+
+\begin{table}[H]
+\centering
+\caption{Technology stack summary}
+\label{tab:stack}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Layer}    & \textbf{Technology}                  & \textbf{Deployment} \\
+\midrule
+Frontend          & React 19, Vite 8, Tailwind CSS 4     & Vercel \\
+Backend API       & FastAPI, Uvicorn                      & Render (free tier) \\
+ML Model          & scikit-learn (Logistic Regression)    & Loaded via joblib \\
+Vector Store      & ChromaDB (Ephemeral Client)           & In-memory at runtime \\
+Embeddings        & all-MiniLM-L6-v2 (precomputed)       & Pickle file \\
+Agent Orchestration & LangGraph StateGraph                & 8-node pipeline \\
+LLM (Agents)      & Llama 3.3-70B-Versatile              & Groq API \\
+LLM (Judge)       & Llama 3.3-70B-Instruct               & NVIDIA AI Endpoints \\
+Keep-Alive        & GitHub Actions (cron)                 & Every 14 minutes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ════════════════════════════════════════════════════════════
+\section{Results and Analysis}
+% ════════════════════════════════════════════════════════════
+
+\subsection{ML Model Performance}
+
+The Logistic Regression classifier was evaluated on a held-out 20\% test
+split of the ISOT dataset.
+
+\begin{table}[H]
+\centering
+\caption{ML model evaluation metrics on the ISOT test set}
+\label{tab:ml-metrics}
+\begin{tabular}{@{}lc@{}}
+\toprule
+\textbf{Metric}              & \textbf{Score} \\
+\midrule
+Accuracy                     & 98.88\% \\
+Precision (weighted)         & 98.88\% \\
+Recall (weighted)            & 98.88\% \\
+F1 Score (weighted)          & 98.88\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Per-class performance}
+\label{tab:per-class}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Class} & \textbf{Precision} & \textbf{Recall} & \textbf{F1 Score} \\
+\midrule
+REAL  & 0.9835 & 0.9930 & 0.9882 \\
+FAKE  & 0.9936 & 0.9849 & 0.9892 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Confusion matrix (test set: 8{,}980 articles)}
+\label{tab:confusion}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+                      & \textbf{Predicted REAL} & \textbf{Predicted FAKE} \\
+\midrule
+\textbf{Actual REAL}  & 4{,}240                & 30 \\
+\textbf{Actual FAKE}  & 71                     & 4{,}639 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The model achieves near-perfect accuracy on the ISOT dataset. However, it
+is important to note that this performance reflects the dataset's
+characteristics (clear stylistic differences between the real and fake
+article sources) and may not generalise to adversarial or out-of-domain
+content.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.55\textwidth]{confusion_matrix.png}
+    \caption{Confusion matrix for the Logistic Regression classifier on the
+             ISOT test set.}
+    \label{fig:confusion}
+\end{figure}
+
+
+\subsection{Conditional RAG Behaviour}
+
+The 85\% confidence threshold was chosen based on empirical observation:
+articles with ML confidence above this threshold typically receive
+consistent verdicts from the agents regardless of retrieved evidence. For
+articles below this threshold, the RAG evidence meaningfully influences
+agent reasoning by providing ground-truth reference articles for
+comparison.
+
+\subsection{Multi-Agent Agreement Patterns}
+
+Qualitative analysis of the system's outputs reveals the following patterns:
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{High agreement (3/3 aligned)}: Observed on clearly fake
+          or clearly real articles where ML confidence is high and RAG
+          evidence is consistent.
+    \item \textbf{Medium agreement (2/1 split)}: Typically occurs on
+          articles with ambiguous language or where the ML confidence is
+          moderate (60--85\%). Agent~B (Sceptical) is most likely to
+          dissent.
+    \item \textbf{Low agreement}: Rare; generally indicates genuinely
+          ambiguous content where the system appropriately signals
+          uncertainty.
+\end{itemize}
+
+
+% ════════════════════════════════════════════════════════════
+\section{Discussion}
+% ════════════════════════════════════════════════════════════
+
+\subsection{Strengths}
+
+\begin{enumerate}[leftmargin=2em]
+    \item \textbf{Interpretability}: Unlike a black-box classifier, the
+          system provides three independent reasoning perspectives and a
+          synthesis explanation, allowing users to understand \emph{why} a
+          verdict was reached.
+    \item \textbf{Layered confidence}: The combination of ML confidence,
+          agent agreement level, and computed risk factors gives users
+          multiple axes for calibrating trust.
+    \item \textbf{Efficient deployment}: Precomputed embeddings and an
+          ephemeral vector store eliminate the need for persistent storage
+          or GPU inference, enabling deployment on free-tier cloud services.
+    \item \textbf{Conditional RAG}: Skipping retrieval for high-confidence
+          predictions reduces average latency without sacrificing quality
+          on ambiguous inputs.
+    \item \textbf{Dual-provider LLM}: Using separate LLM providers (Groq
+          for agents, NVIDIA for the judge) reduces single-provider bias
+          and adds resilience through fallback.
+\end{enumerate}
+
+\subsection{Limitations}
+
+\begin{enumerate}[leftmargin=2em]
+    \item \textbf{Dataset bias}: The ISOT dataset contains articles from
+          specific sources (Reuters for real, Politifact-flagged sites for
+          fake). The ML model and RAG evidence may not generalise well to
+          articles from other domains, languages, or writing styles.
+    \item \textbf{Sequential agent execution}: Agents run in series
+          (A~$\to$~B~$\to$~C), adding latency. Parallel execution would
+          reduce response time but requires careful state management.
+    \item \textbf{Cold start}: On Render's free tier, the first request
+          after a sleep period takes 15--30 seconds due to model loading
+          and embedding initialisation.
+    \item \textbf{Single-mode backend}: The frontend offers a ``Classical
+          ML'' mode, but the backend always runs the full agentic pipeline.
+          A dedicated ML-only endpoint would reduce latency for users who
+          do not need agent reasoning.
+    \item \textbf{Embedding sample size}: Only 5{,}000 of the
+          approximately 44{,}000 ISOT articles are embedded for RAG
+          retrieval, limiting evidence coverage.
+    \item \textbf{No real-time fact-checking}: The system analyses
+          linguistic patterns and compares against a static dataset. It
+          does not perform live web searches or consult fact-checking
+          databases.
+\end{enumerate}
+
+
+% ════════════════════════════════════════════════════════════
+\section{Responsible AI Considerations}
+% ════════════════════════════════════════════════════════════
+
+The design of this system incorporates several responsible AI principles:
+
+\begin{enumerate}[leftmargin=2em]
+    \item \textbf{Transparency}: Every verdict is accompanied by
+          per-agent reasoning, evidence references, and risk factors.
+          Users can inspect the full chain of reasoning, not just a final
+          label.
+    \item \textbf{Uncertainty signalling}: When the system is uncertain
+          (low ML confidence, low agent agreement, mixed RAG evidence),
+          risk factors are explicitly surfaced rather than hidden.
+    \item \textbf{Anti-hallucination measures}: LLM agents are prompted
+          with ``Respond ONLY based on the evidence provided. Never invent
+          or hallucinate facts.'' RAG evidence is drawn from a verified
+          dataset.
+    \item \textbf{Multi-perspective reasoning}: By design, the three
+          agents represent different analytical stances, reducing the risk
+          of a single-perspective bias dominating the verdict.
+    \item \textbf{Disclaimer-ready design}: The system is designed as a
+          decision-support tool, not an authority. Risk factors and
+          confidence levels encourage users to exercise their own judgment.
+    \item \textbf{Data privacy}: Article text is processed in real time
+          and not stored. No user data is persisted on the server.
+    \item \textbf{API key security}: Secrets are managed via environment
+          variables and are never committed to the repository. A
+          \texttt{.env.example} template documents required variables
+          without exposing real values.
+\end{enumerate}
+
+
+% ════════════════════════════════════════════════════════════
+\section{Conclusion}
+% ════════════════════════════════════════════════════════════
+
+This project demonstrates that combining classical machine learning,
+retrieval-augmented generation, and multi-agent LLM reasoning into a
+unified pipeline produces a news credibility analysis system that is both
+accurate and interpretable. The ML layer provides a fast, high-accuracy
+initial signal; the RAG layer grounds the analysis in verified evidence;
+and the multi-agent system delivers transparent, multi-perspective
+reasoning that enables users to understand and evaluate the verdict.
+
+The conditional RAG mechanism and lazy-loading architecture make the system
+deployable on free-tier cloud infrastructure, demonstrating that
+sophisticated AI pipelines need not require expensive compute resources.
+
+Future work could extend the system with parallel agent execution for lower
+latency, integration with live fact-checking APIs for real-time evidence,
+expansion of the embedding corpus beyond the ISOT dataset, and a dedicated
+ML-only endpoint for latency-sensitive use cases.
+
+
+% ════════════════════════════════════════════════════════════
+% Appendices (optional)
+% ════════════════════════════════════════════════════════════
+
+\newpage
+\appendix
+
+\section{Frontend Screenshots}
+\label{app:screenshots}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{landing_page.png}
+    \caption{Article input interface with mode selection.}
+    \label{fig:screenshot-input}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{thinking.png}
+    \caption{Real-time processing pipeline showing active analysis steps.}
+    \label{fig:screenshot-pipeline}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{result.png}
+    \caption{Final verdict display with agent reasoning, evidence summary,
+             and risk indicators.}
+    \label{fig:screenshot-verdict}
+\end{figure}
+
+\end{document}
