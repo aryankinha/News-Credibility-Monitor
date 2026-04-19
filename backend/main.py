@@ -4,10 +4,22 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.agent.graph import run_agent
-
 # Load .env from the backend directory (sibling of this file).
 load_dotenv()
+
+# NOTE: heavy ML imports (sentence-transformers, chromadb, sklearn models)
+# are deferred to first request so the port binds before the 512Mi free-tier
+# limit is hit at boot. Do NOT import run_agent at module top.
+_run_agent = None
+
+
+def get_run_agent():
+    global _run_agent
+    if _run_agent is None:
+        from src.agent.graph import run_agent  # noqa: WPS433 (lazy import on purpose)
+
+        _run_agent = run_agent
+    return _run_agent
 
 app = FastAPI(title="News Credibility Monitor API")
 
@@ -52,8 +64,8 @@ def analyze(data: dict):
         return {"error": "Text too short. Please provide at least 50 words for analysis."}
 
     try:
-        # We just invoke the pipeline asynchronously or synchronously based on defined rules
-        result = run_agent(text)
+        # Lazy-load the agent graph so cold-boot fits in Render's 512Mi free tier.
+        result = get_run_agent()(text)
         return result
     except Exception as e:
         return {"error": str(e)}
