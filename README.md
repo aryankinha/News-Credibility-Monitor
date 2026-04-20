@@ -1,86 +1,205 @@
+<div align="center">
+
 # News Credibility Monitor
 
-A hybrid ML + agentic reasoning system for news credibility analysis.
+**An AI-powered news verification system combining ML classification, retrieval-augmented generation, and multi-agent LLM reasoning.**
 
-The project combines:
-- A classical baseline: TF-IDF + Logistic Regression
-- A multi-agent reasoning pipeline: LangGraph + Groq + NVIDIA judge + Chroma retrieval
-- A FastAPI backend and a React/Vite frontend
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Visit_App-00C853?style=for-the-badge&logo=vercel&logoColor=white)](https://news-credibility-monitor.vercel.app/)
+[![API](https://img.shields.io/badge/API-Render-4351e8?style=for-the-badge&logo=render&logoColor=white)](https://news-credibility-monitor-api.onrender.com/)
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)]()
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi&logoColor=white)]()
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)]()
+[![LangGraph](https://img.shields.io/badge/LangGraph-Agent_Pipeline-1C3C3C?style=flat-square&logo=langchain&logoColor=white)]()
 
-## Current Status
+</div>
 
-- Milestone 1 (implemented): Classical ML credibility classification
-- Milestone 2 (partially implemented): Multi-agent analysis with RAG and judge synthesis
+---
 
-## Highlights
+| | |
+|---|---|
+| **Frontend** | https://news-credibility-monitor.vercel.app/ |
+| **Backend API** | https://news-credibility-monitor-api.onrender.com/ |
+| **ML Accuracy** | 98.88 % (ISOT dataset) |
+| **Dataset** | ISOT Fake / True News (44,898 articles) |
 
-- Dataset: ISOT Fake/True news CSV files
-- Baseline model: Logistic Regression with TF-IDF bigrams
-- Test performance (latest tracked):
-  - Accuracy: 98.88%
-  - Weighted Precision: 98.88%
-  - Weighted Recall: 98.88%
-  - Weighted F1: 98.88%
-- Frontend UX includes animated pipeline stages, agent breakdown, evidence and risk factors
+---
 
-Metrics source in repo:
-- `docs/metrics.json`
+## What It Does
 
-## Repository Layout
+Paste a news article → the system runs a **6-stage agentic pipeline** and returns a credibility verdict with full transparency: per-agent reasoning, evidence previews, agreement levels, and risk factors.
 
-```text
-News-Credibility-Monitor/
-├── README.md
-├── requirements_deploy.txt
-├── backend/
-│   ├── main.py
-│   ├── requirements.txt
-│   ├── data/raw/
-│   │   ├── Fake.csv
-│   │   └── True.csv
-│   ├── models/
-│   ├── scripts/build_embeddings.py
-│   └── src/
-│       ├── agent/
-│       ├── config/
-│       ├── data/
-│       ├── features/
-│       ├── llm/
-│       ├── models/
-│       ├── pipeline/
-│       ├── rag/
-│       └── utils/
-├── frontend/
-│   ├── package.json
-│   ├── index.html
-│   └── src/
-├── docs/
-├── notebooks/
-└── Report/
+```
+Article → Preprocessing → ML Classification → Conditional RAG → 3 LLM Agents → Judge → Verdict
 ```
 
-## Backend Overview
+## Key Features
 
-Backend entrypoint:
-- `backend/main.py`
+- **Hybrid ML + LLM pipeline** — TF-IDF + Logistic Regression baseline feeds into a multi-agent LLM layer
+- **Conditional RAG** — retrieval triggers only when ML confidence < 85%, saving latency on clear-cut cases
+- **Multi-agent debate** — three agents (Conservative, Skeptical, Neutral) reason independently over the same evidence
+- **Judge aggregation** — a separate judge model synthesizes a final verdict with conflict resolution
+- **Risk transparency** — automated rule-based risk factors (low confidence, mixed evidence, weak consensus) surfaced in the UI
+- **Animated pipeline visualization** — real-time step-by-step progress as the backend processes
 
-API endpoints:
-- `GET /` health/status
-- `POST /analyze` full analysis pipeline
+---
 
-Input validation:
-- Requires at least 50 words in `text`
+## Tech Stack
 
-Example request:
+| Layer | Technology | Purpose |
+|---|---|---|
+| Frontend | React 19, Vite 8, Tailwind CSS 4 | UI with animated pipeline visualization |
+| Backend | FastAPI, Uvicorn | REST API (`POST /analyze`) |
+| ML Model | scikit-learn (Logistic Regression) | TF-IDF baseline (98.88% accuracy) |
+| Vector Store | ChromaDB (Ephemeral Client) | Conditional RAG retrieval |
+| Embeddings | all-MiniLM-L6-v2 (precomputed) | 5,000 article embeddings |
+| Agent Orchestration | LangGraph StateGraph | 8-node pipeline with conditional edges |
+| LLM (Agents) | Llama 3.3-70B-Versatile | Groq API (temp 0.3) |
+| LLM (Judge) | Llama 3.3-70B-Instruct | NVIDIA AI Endpoints (temp 0.2) |
+| Deployment | Vercel + Render (free tier) | Frontend + backend hosting |
+| Keep-Alive | GitHub Actions | Cron job every 14 min to prevent cold starts |
+
+---
+
+## Pipeline Architecture
+
+```
+                    ┌──────────────┐
+                    │  User Input  │
+                    └──────┬───────┘
+                           │
+                    ┌──────▼───────┐
+                    │  preprocess  │  Strip datelines, lowercase, remove stopwords
+                    └──────┬───────┘
+                           │
+                    ┌──────▼───────┐
+                    │   ml_node    │  TF-IDF → Logistic Regression → verdict + confidence
+                    └──────┬───────┘
+                           │
+                    ┌──────▼───────┐
+                    │  Confidence  │
+                    │   ≥ 85% ?    │
+                    └──┬───────┬───┘
+                  Yes  │       │  No
+                       │  ┌────▼────┐
+                       │  │rag_node │  ChromaDB top-5 retrieval
+                       │  └────┬────┘
+                       │       │
+                    ┌──▼───────▼───┐
+                    │   Agent A    │  Conservative — trusts ML & data
+                    │   Agent B    │  Skeptical — challenges evidence
+                    │   Agent C    │  Neutral — balanced weighing
+                    └──────┬───────┘
+                           │
+                    ┌──────▼───────┐
+                    │  Judge Node  │  Synthesizes final verdict + consensus
+                    └──────┬───────┘
+                           │
+                    ┌──────▼───────┐
+                    │ Output Node  │  Risk factors, agreement, structured report
+                    └──────┬───────┘
+                           │
+                    ┌──────▼───────┐
+                    │   Response   │
+                    └──────────────┘
+```
+
+---
+
+## Repository Structure
+
+```
+News-Credibility-Monitor/
+├── backend/
+│   ├── main.py                          # FastAPI entrypoint
+│   ├── requirements.txt                 # Full dependencies
+│   ├── requirements_deploy.txt          # Lean deployment deps (no PyTorch)
+│   ├── render.yaml                      # Render service config
+│   ├── data/raw/
+│   │   ├── Fake.csv                     # ISOT Fake News
+│   │   └── True.csv                     # ISOT True News
+│   ├── models/
+│   │   ├── best_model.pkl               # Trained Logistic Regression
+│   │   ├── tfidf_vectorizer.pkl         # Fitted TF-IDF vectorizer
+│   │   └── embeddings.pkl               # Precomputed MiniLM embeddings
+│   ├── scripts/
+│   │   └── build_embeddings.py          # Embedding generation script
+│   └── src/
+│       ├── agent/
+│       │   ├── graph.py                 # LangGraph StateGraph definition
+│       │   ├── nodes.py                 # 8 node functions + routing logic
+│       │   └── state.py                 # AgentState TypedDict
+│       ├── llm/
+│       │   ├── client.py                # Groq API client with retry logic
+│       │   └── prompts.py               # Agent & judge prompt templates
+│       ├── rag/
+│       │   ├── load_embeddings.py       # ChromaDB ephemeral loader
+│       │   └── retriever.py             # Semantic similarity search (k=5)
+│       ├── models/
+│       │   ├── train.py                 # LogReg training
+│       │   └── evaluate.py              # Metrics & confusion matrix
+│       ├── features/
+│       │   └── build_features.py        # TF-IDF vectorizer builder
+│       ├── data/
+│       │   └── load_data.py             # CSV loading & merging
+│       ├── pipeline/
+│       │   └── training_pipeline.py     # End-to-end training orchestration
+│       ├── config/
+│       │   └── config.py                # Paths & constants
+│       └── utils/
+│           └── text_cleaner.py          # Regex cleaning + stopword removal
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx                      # Main app with pipeline animation
+│   │   ├── lib/
+│   │   │   └── normalizeAnalysis.js     # Backend → UI payload transform
+│   │   └── components/
+│   │       ├── InputSection.jsx         # Article input + word counter
+│   │       ├── VerdictCard.jsx          # Final verdict display
+│   │       ├── AgentSection.jsx         # 3 agent cards (expandable)
+│   │       ├── AgreementSection.jsx     # Vote distribution
+│   │       ├── EvidenceSection.jsx      # RAG doc previews
+│   │       ├── RiskSection.jsx          # Risk factor badges
+│   │       ├── ThinkingPipeline.jsx     # Animated step progress
+│   │       └── background/
+│   │           └── SoftAuroraBackground.jsx  # WebGL shader background
+│   ├── vercel.json                      # Vercel SPA config
+│   └── package.json
+├── .github/workflows/
+│   └── keep-alive.yml                   # Cron ping every 14 min
+├── Report/
+│   └── report.tex                       # LaTeX project report
+├── notebooks/
+│   ├── 01_data_exploration.ipynb
+│   ├── 02_feature_engineering.ipynb
+│   └── 03_model_comparison.ipynb
+└── docs/
+```
+
+---
+
+## API Reference
+
+### `GET /`
+
+Health check.
 
 ```json
+{ "status": "ok", "message": "News Credibility Monitor API is running" }
+```
+
+### `POST /analyze`
+
+Analyze an article for credibility.
+
+**Request:**
+```json
 {
-  "text": "Your article text with at least 50 words..."
+  "text": "Article text (minimum 50 words)...",
+  "mode": "agentic"
 }
 ```
 
-Example response shape:
-
+**Response:**
 ```json
 {
   "agent_a": { "verdict": "REAL", "confidence": "89", "reasoning": "..." },
@@ -103,134 +222,40 @@ Example response shape:
     "fake_docs": 2,
     "previews": ["...", "..."]
   },
-  "risk_factors": ["..."],
+  "risk_factors": ["Low ML confidence (<70%)", "Weak consensus (2 vs 1 split)"],
   "ml_signal": "REAL (91.2%)",
-  "rag_count": 5
+  "rag_count": 5,
+  "error": null
 }
 ```
 
-Note:
-- The backend currently returns error payloads as JSON objects, for example `{ "error": "..." }`.
+---
 
-## Agentic Pipeline
+## Local Development
 
-Core graph and nodes:
-- `backend/src/agent/graph.py`
-- `backend/src/agent/nodes.py`
-- `backend/src/agent/state.py`
-
-Execution flow:
-1. `preprocess_node` cleans text
-2. `ml_node` predicts class + confidence
-3. Route by confidence threshold (85%):
-   - High confidence: skip retrieval and continue to agents
-   - Low confidence: run retrieval first
-4. Agent A (conservative), Agent B (skeptical), Agent C (neutral)
-5. Judge synthesizes consensus
-6. Output node builds structured report
-
-LLM providers in code:
-- Primary agent generation: Groq API (`GROQ_API_KEY`)
-- Judge attempt: NVIDIA endpoint (`NVIDIA_API_KEY`), with fallback
-
-## ML Pipeline
-
-Training orchestration:
-- `backend/src/pipeline/training_pipeline.py`
-
-Main stages:
-1. Load and merge `Fake.csv` and `True.csv`
-2. Clean text (dateline removal, regex cleanup, stopword removal)
-3. Build TF-IDF features (`max_features=10000`, `ngram_range=(1,2)`)
-4. Train Logistic Regression (`class_weight="balanced"`)
-5. Evaluate and persist artifacts
-
-Artifacts saved to:
-- `backend/models/best_model.pkl`
-- `backend/models/tfidf_vectorizer.pkl`
-- `backend/models/metrics.json`
-- `backend/models/confusion_matrix.png`
-
-## Retrieval (RAG)
-
-Implemented components:
-- `backend/src/rag/build_db.py` (persistent Chroma DB build path)
-- `backend/src/rag/load_embeddings.py` (load from precomputed embeddings)
-- `backend/src/rag/retriever.py` (top-k retrieval)
-- `backend/scripts/build_embeddings.py` (creates `models/embeddings.pkl`)
-
-Embedding model used:
-- `all-MiniLM-L6-v2`
-
-## Frontend Overview
-
-Frontend app entry:
-- `frontend/src/App.jsx`
-
-Stack:
-- React + Vite + Tailwind + OGL background effect
-
-UI behavior:
-- Enforces minimum 50 words before submission
-- Calls backend `POST /analyze`
-- Shows staged pipeline animation
-- Normalizes backend payload into:
-  - final verdict
-  - agreement block
-  - per-agent cards
-  - evidence summary
-  - risk factors
-
-Normalization logic:
-- `frontend/src/lib/normalizeAnalysis.js`
-
-Backend URL configuration:
-- `VITE_API_BASE_URL`
-- If unset, frontend uses same-origin path `/analyze`
-
-## Local Setup
-
-## 1) Backend
+### Backend
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-Download NLTK stopwords once:
-
-```bash
 python -c "import nltk; nltk.download('stopwords')"
 ```
 
-Train model artifacts (first run):
-
+**First-time setup** — train ML model and build embeddings:
 ```bash
 python -m src.pipeline.training_pipeline
-```
-
-Build retrieval embeddings (recommended for current retriever path):
-
-```bash
 python scripts/build_embeddings.py
 ```
 
-Set environment variables:
-
+**Set API keys and run:**
 ```bash
 export GROQ_API_KEY='your_groq_key'
-export NVIDIA_API_KEY='your_nvidia_key'   # optional but supported by judge node
-```
-
-Run API:
-
-```bash
+export NVIDIA_API_KEY='your_nvidia_key'
 uvicorn main:app --reload --port 8000
 ```
 
-## 2) Frontend
+### Frontend
 
 ```bash
 cd frontend
@@ -238,41 +263,66 @@ npm install
 VITE_API_BASE_URL=http://localhost:8000 npm run dev
 ```
 
-Build frontend for production:
-
+**Production build:**
 ```bash
-npm run build
-npm run preview
+npm run build && npm run preview
 ```
+
+---
+
+## Deployment
+
+| Service | Platform | Config |
+|---|---|---|
+| Frontend | Vercel | `frontend/vercel.json` — SPA rewrite to `index.html` |
+| Backend | Render (free tier) | `render.yaml` — uvicorn, 1 worker, 512 MB |
+| Keep-Alive | GitHub Actions | `.github/workflows/keep-alive.yml` — cron `*/14 * * * *` |
+
+**Environment variables** (set in Render dashboard):
+- `GROQ_API_KEY` — Groq API key for agent LLM calls
+- `NVIDIA_API_KEY` — NVIDIA AI Endpoints key for judge model
+- `CORS_ALLOW_ORIGINS` — allowed frontend origins
+
+The deployment uses `requirements_deploy.txt` (excludes PyTorch, Jupyter, sentence-transformers) to fit within Render's 512 MB free-tier memory limit.
+
+---
+
+## ML Model Performance
+
+Evaluated on a 20% held-out split of the ISOT Fake News Dataset.
+
+| Metric | Score |
+|---|---|
+| Accuracy | 98.88% |
+| Precision (weighted) | 98.88% |
+| Recall (weighted) | 98.88% |
+| F1 (weighted) | 98.88% |
+
+**Model:** Logistic Regression (`class_weight="balanced"`, solver `lbfgs`, max_iter 1000)
+**Features:** TF-IDF vectorizer (10,000 features, unigram + bigram)
+
+---
 
 ## Data Requirements
 
-Required raw files:
+Required raw files (not committed to repo):
 - `backend/data/raw/Fake.csv`
 - `backend/data/raw/True.csv`
 
-Without these files, training and embedding build scripts will fail.
+Source: [ISOT Fake News Dataset](https://www.uvic.ca/ecs/ece/isot/datasets/fake-news/index.php)
 
-## Deployment Notes
+---
 
-- Hosted frontend: https://news-credibility-monitor.vercel.app/
-- Root `requirements_deploy.txt` provides a lightweight deployment dependency set.
-- Frontend is a standard Vite static build output.
-- Backend is a FastAPI service and can be containerized or deployed on any Python host.
+## Report & Notebooks
 
-## Known Implementation Notes
+| Document | Path |
+|---|---|
+| LaTeX Report | `Report/report.tex` |
+| Data Exploration | `notebooks/01_data_exploration.ipynb` |
+| Feature Engineering | `notebooks/02_feature_engineering.ipynb` |
+| Model Comparison | `notebooks/03_model_comparison.ipynb` |
 
-- The frontend sends `{ text, mode }` but backend currently reads only `text`.
-- `POST /analyze` returns the final report object directly (not wrapped in an additional key).
-- Retrieval path currently depends on precomputed embeddings load path used by the retriever helper.
-
-## Report and Notebooks
-
-- Technical report source: `Report/report.tex`
-- Notebooks:
-  - `notebooks/01_data_exploration.ipynb`
-  - `notebooks/02_feature_engineering.ipynb`
-  - `notebooks/03_model_comparison.ipynb`
+---
 
 ## License
 
